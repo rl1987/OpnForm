@@ -1,8 +1,9 @@
----
+version: '3.8'  # Specify the version of the Docker Compose file
+
 services:
   api: &api
     image: jhumanj/opnform-api:latest
-    environment: &api-environment  # Add this anchor
+    environment: &api-environment
       DB_HOST: db
       REDIS_HOST: redis
       DB_DATABASE: ${DB_DATABASE:-forge}
@@ -44,12 +45,24 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
-  ingress:
+  nginx:
     image: nginx:1
     volumes:
       - ./docker/nginx.conf:/etc/nginx/templates/default.conf.template
+      - ./certbot/conf:/etc/letsencrypt  # Mount the volume for Certbot
+      - ./certbot/www:/var/www/certbot    # Mount the volume for challenge files
     ports:
-      - 80:80
+      - "80:80"
+      - "443:443"  # Expose the HTTPS port
+    depends_on:
+      - certbot
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
 volumes:
   postgres-data:
